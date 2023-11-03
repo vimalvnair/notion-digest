@@ -1,12 +1,40 @@
 mod notion;
 
-use std::{env, fs::File, io::Write};
+use std::{env, fs::{File, self}, io::Write, path::Path};
 use notion::NotionPage;
+use rand::Rng;
+
+const NOTION_LINKS_FILENAME: &str = "notion_links.json";
+// const SENT_NOTION_LINKS_FILENAME: &str = "sent_notion_links.json";
+const NUMBER_OF_LINKS_TO_FECTH: i32 = 3;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    let notion_links = get_notion_links().await?;
-    save_notion_links_to_file(&notion_links);
+    let notion_links_file = Path::new(NOTION_LINKS_FILENAME);
+
+    if notion_links_file.exists() {
+        println!("links already saved! no need to fetch");
+
+        let contents = fs::read_to_string(NOTION_LINKS_FILENAME).unwrap();
+        let notion_links: Vec<notion::NotionLink> = serde_json::from_str(&contents).unwrap();
+        let total_number_of_links = notion_links.len();
+
+        for _ in 0..NUMBER_OF_LINKS_TO_FECTH{
+            let mut rng = rand::thread_rng();
+            let random_index = rng.gen_range(0..total_number_of_links);
+
+            println!("Fetching link at index: {}", random_index);
+
+            let random_notion_link = notion_links.get(random_index).unwrap();
+
+            println!("Random notion link = {:?}", random_notion_link);
+        }
+    } else {
+        println!("getting links from notion");
+
+        let notion_links = get_notion_links().await?;
+        save_notion_links_to_file(&notion_links);
+    }
 
     Ok(())
 }
@@ -88,6 +116,6 @@ async fn get_notion_page(request_params: &notion::Params) -> Result<NotionPage, 
 
 fn save_notion_links_to_file(notion_links: &Vec<notion::NotionLink>){
     let links = serde_json::to_string(notion_links).unwrap();
-    let mut file = File::create("notion_links.json").unwrap();
+    let mut file = File::create(NOTION_LINKS_FILENAME).unwrap();
     file.write_all(links.as_bytes()).unwrap();
 }
