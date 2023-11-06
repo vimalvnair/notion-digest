@@ -7,7 +7,7 @@ pub struct NotionPages{
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NotionLink{
-    pub id: String,
+    pub link_id: String,
     pub url: String,
     pub title: String
 }
@@ -22,7 +22,8 @@ pub struct NotionPage{
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename(deserialize = "Result"))]
 pub struct NotionResult{
-    pub id: String,
+    #[serde(rename(deserialize = "id"))]
+    pub link_id: String,
     pub properties: Properties
 }
 
@@ -65,4 +66,10 @@ pub struct Params{
 pub struct Sort{
     pub property: String,
     pub direction: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SentLink{
+    pub id: String,
+    pub sent_at: String
 }
