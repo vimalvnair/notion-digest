@@ -21,13 +21,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         println!("links already saved! no need to fetch");
 
         // sendgrid::send_email().await?;
+        let mut stored_link_ids: Vec<String> = Vec::new();
+
+        let stored_links_path = Path::new(SENT_NOTION_LINKS_FILENAME);
+
+        if stored_links_path.exists() {
+            let stored_links_content = fs::read_to_string(SENT_NOTION_LINKS_FILENAME).unwrap();
+            let parsed_stored_links: Vec<notion::SentLink> = serde_json::from_str(&stored_links_content).unwrap();
+            stored_link_ids = parsed_stored_links.iter().map(|link| link.id.to_string() ).collect();
+        }
 
         let notion_links = fs::read_to_string(NOTION_LINKS_FILENAME).unwrap();
         let notion_links: Vec<notion::NotionLink> = serde_json::from_str(&notion_links).unwrap();
+        let notion_links: Vec<notion::NotionLink> = notion_links.into_iter().filter(|link|{
+            !stored_link_ids.contains(&link.link_id)
+        }).collect();
 
         let total_number_of_links = notion_links.len();
         let number_of_links_to_fetch = if total_number_of_links > NUMBER_OF_LINKS_TO_FECTH { NUMBER_OF_LINKS_TO_FECTH } else { total_number_of_links };
-
+        println!("total_number_of_links = {}", total_number_of_links);
         let mut rng = rand::thread_rng();
         let links_to_send: Vec<&notion::NotionLink> = (0..number_of_links_to_fetch).into_iter()
             .map(|_|{
@@ -63,12 +75,12 @@ fn record_sent_links(sent_links: &Vec<&notion::NotionLink>){
         .open(SENT_NOTION_LINKS_FILENAME)
         .unwrap();
 
-        let mut sent_links: Vec<notion::SentLink> = sent_links.iter().map(|link| {
-            notion::SentLink{
-                id: link.link_id.to_string(),
-                sent_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().to_string()
-            }
-        }).collect();
+    let mut sent_links: Vec<notion::SentLink> = sent_links.iter().map(|link| {
+        notion::SentLink{
+            id: link.link_id.to_string(),
+            sent_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs().to_string()
+        }
+    }).collect();
 
     if file.metadata().unwrap().len() == 0 {
         file.write_all(serde_json::to_string(&sent_links).unwrap().as_bytes()).unwrap();
