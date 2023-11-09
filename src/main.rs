@@ -8,63 +8,70 @@ use rand::Rng;
 mod notion;
 mod sendgrid;
 use notion::NotionPage;
+use rand::seq::SliceRandom;
 
 const NOTION_LINKS_FILENAME: &str = "notion_links.json";
 const SENT_NOTION_LINKS_FILENAME: &str = "sent_notion_links.json";
-const NUMBER_OF_LINKS_TO_FECTH: usize = 3;
+const NUMBER_OF_LINKS_TO_FECTH: usize = 20;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
+    let notion_links = notion_links().await?;
+    let mut stored_link_ids: Vec<String> = Vec::new();
+    let stored_links_path = Path::new(SENT_NOTION_LINKS_FILENAME);
+
+    if stored_links_path.exists() {
+        let stored_links_content = fs::read_to_string(SENT_NOTION_LINKS_FILENAME).unwrap();
+        let parsed_stored_links: Vec<notion::SentLink> = serde_json::from_str(&stored_links_content).unwrap();
+        stored_link_ids = parsed_stored_links.iter().map(|link| link.id.to_string() ).collect();
+    }
+
+    let filtered_notion_links: Vec<notion::NotionLink> = notion_links.into_iter().filter(|link|{
+        !stored_link_ids.contains(&link.link_id)
+    }).collect();
+
+    let total_number_of_links = filtered_notion_links.len();
+    let number_of_links_to_fetch = if total_number_of_links > NUMBER_OF_LINKS_TO_FECTH { NUMBER_OF_LINKS_TO_FECTH } else { total_number_of_links };
+    println!("total_number_of_links = {}", total_number_of_links);
+
+    let mut rng = rand::thread_rng();
+    let mut numbers: Vec<usize> = (0..total_number_of_links).into_iter().collect();
+    numbers.shuffle(&mut rng);
+    let random_indices = &numbers[0..number_of_links_to_fetch];
+    println!("shuffled random numbers: {:?}", random_indices);
+
+    let links_to_send: Vec<&notion::NotionLink> = random_indices.into_iter()
+    .map(|idx|{
+        println!("Fetching link at index: {}", idx);
+
+        let random_notion_link = filtered_notion_links.get(*idx).unwrap();
+
+        println!("Random notion link = {:?}", random_notion_link);
+
+        random_notion_link
+    }).collect();
+
+    println!("links to send = {:?}", links_to_send);
+    // sendgrid::send_email().await?;
+    record_sent_links(&links_to_send);
+
+    Ok(())
+}
+
+async fn notion_links() -> Result<Vec<notion::NotionLink>, Box<dyn std::error::Error>>{
     let notion_links_file = Path::new(NOTION_LINKS_FILENAME);
 
     if notion_links_file.exists() {
         println!("links already saved! no need to fetch");
-
-        // sendgrid::send_email().await?;
-        let mut stored_link_ids: Vec<String> = Vec::new();
-
-        let stored_links_path = Path::new(SENT_NOTION_LINKS_FILENAME);
-
-        if stored_links_path.exists() {
-            let stored_links_content = fs::read_to_string(SENT_NOTION_LINKS_FILENAME).unwrap();
-            let parsed_stored_links: Vec<notion::SentLink> = serde_json::from_str(&stored_links_content).unwrap();
-            stored_link_ids = parsed_stored_links.iter().map(|link| link.id.to_string() ).collect();
-        }
-
         let notion_links = fs::read_to_string(NOTION_LINKS_FILENAME).unwrap();
         let notion_links: Vec<notion::NotionLink> = serde_json::from_str(&notion_links).unwrap();
-        let notion_links: Vec<notion::NotionLink> = notion_links.into_iter().filter(|link|{
-            !stored_link_ids.contains(&link.link_id)
-        }).collect();
-
-        let total_number_of_links = notion_links.len();
-        let number_of_links_to_fetch = if total_number_of_links > NUMBER_OF_LINKS_TO_FECTH { NUMBER_OF_LINKS_TO_FECTH } else { total_number_of_links };
-        println!("total_number_of_links = {}", total_number_of_links);
-        let mut rng = rand::thread_rng();
-        let links_to_send: Vec<&notion::NotionLink> = (0..number_of_links_to_fetch).into_iter()
-            .map(|_|{
-                let random_index = rng.gen_range(0..total_number_of_links);
-
-                println!("Fetching link at index: {}", random_index);
-
-                let random_notion_link = notion_links.get(random_index).unwrap();
-
-                println!("Random notion link = {:?}", random_notion_link);
-
-                random_notion_link
-            }).collect();
-
-        println!("links to send = {:?}", links_to_send);
-
-        record_sent_links(&links_to_send);
+        return Ok(notion_links);
     } else {
         println!("getting links from notion");
-
         let notion_links = get_notion_links().await?;
         save_notion_links_to_file(&notion_links);
+        return Ok(notion_links);
     }
-
-    Ok(())
 }
 
 fn record_sent_links(sent_links: &Vec<&notion::NotionLink>){
