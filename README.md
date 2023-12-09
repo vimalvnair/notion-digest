@@ -22,6 +22,9 @@ Configure the application using these environment variables:
   <img width="244" alt="" src="https://github.com/vimalvnair/notion-digest/assets/1711390/88e8f7fc-6bb2-475a-acb2-0d52c373d659">
 
 
+## Example email preview
+<img width="665" alt="" src="https://github.com/vimalvnair/notion-digest/assets/1711390/4a6edcf7-1106-4e01-9ae1-9d2150b22954">
+
 
 ### Running the Application
 
