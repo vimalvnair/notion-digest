@@ -1,6 +1,6 @@
 # Notion Links Digest
 
-This Rust application is designed to help you revisit the links you've saved in Notion. It randomly selects three links from your "My links" database and sends them via email, allowing you to discover or re-discover valuable resources you've saved over time.
+This Rust application is designed to help you revisit the links you've saved in Notion. It randomly selects a configurable number of links(default: 3) from your "My links" database and sends them via email, allowing you to discover or re-discover valuable resources you've saved over time.
 
 ## Environment Variables
 
@@ -11,6 +11,7 @@ Configure the application using these environment variables:
 - `SENDGRID_API_KEY`: Your SendGrid API key for email sending capabilities.
 - `FROM_ADDRESS`: The sender's email address for the digest.
 - `TO_ADDRESS`: The intended recipient's email address for the digest.
+- `NUMBER_OF_LINKS_TO_FETCH`: The number of random links to fetch from your "My links" database for the digest email. Default is 3 if not set.
 
 ## Setup Instructions
 
