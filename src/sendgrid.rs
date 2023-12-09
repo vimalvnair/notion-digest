@@ -1,7 +1,7 @@
 use std::env;
 use serde_json::json;
 
-pub async fn send_email() -> Result<(), Box<dyn std::error::Error>>{
+pub async fn send_email(email_body: String) -> Result<(), Box<dyn std::error::Error>>{
   let sendgrid_api_key = env::var("SENDGRID_API_KEY").unwrap();
   let from_address = env::var("FROM_ADDRESS").unwrap();
   let to_address = env::var("TO_ADDRESS").unwrap();
@@ -21,11 +21,11 @@ pub async fn send_email() -> Result<(), Box<dyn std::error::Error>>{
     "from": {
       "email": from_address
     },
-    "subject": "Hello, World!",
+    "subject": "Notion Digest",
     "content": [
       {
         "type": "text/html",
-        "value": "<div><b>Notion</b></div> <div><i>Stuff</i></div>"
+        "value": email_body
       }
     ]
   });

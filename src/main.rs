@@ -3,19 +3,75 @@ use std::path::Path;
 use std::fs::{File, self, OpenOptions};
 use std::io::{Write, Read, Seek};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::Rng;
+use askama::Template;
+use futures::future;
+use rand::seq::SliceRandom;
+
+use notion::NotionPage;
+use scraper::{Html, Selector};
 
 mod notion;
 mod sendgrid;
-use notion::NotionPage;
-use rand::seq::SliceRandom;
+mod local_mail;
 
 const NOTION_LINKS_FILENAME: &str = "notion_links.json";
 const SENT_NOTION_LINKS_FILENAME: &str = "sent_notion_links.json";
-const NUMBER_OF_LINKS_TO_FECTH: usize = 20;
+const NUMBER_OF_LINKS_TO_FECTH: usize = 3;
+
+#[derive(Template)]
+#[template(path="email.html")]
+struct EmailTemplate<'a>{
+    links: Vec<EmailLink<'a>>
+}
+
+struct EmailLink<'a>{
+    title: &'a String,
+    url: &'a String,
+    description: String,
+    image_url: String
+}
+
+impl<'a> EmailLink<'a> {
+    pub async fn new(link: &'a notion::NotionLink) -> Result<Self, Box<dyn std::error::Error>>{
+        let og_attributes = Self::get_description_and_image_url(&link.url).await?;
+
+        Ok(EmailLink{
+            title: &link.title,
+            url: &link.url,
+            description: og_attributes.0,
+            image_url: og_attributes.1
+        })
+    }
+
+    async fn get_description_and_image_url(url: &String) -> Result<(String, String), Box<dyn std::error::Error>>{
+        let body = reqwest::get(url).await?.text().await?;
+        let html_fragment = Html::parse_document(&body);
+
+        let description = Self::get_og_attribute(&html_fragment, "description");
+        let image = Self::get_og_attribute(&html_fragment, "image");
+
+        println!("description = {:?}", description);
+
+        Ok((description, image))
+    }
+
+    fn get_og_attribute(html_fragment: &Html, og_attribute: &str) -> String{
+        let og_description_selector = Selector::parse(&format!("meta[property='og:{}']", og_attribute)).unwrap();
+
+        match html_fragment.select(&og_description_selector).next(){
+            Some(element) => if let Some(content) = element.value().attr("content"){
+                content.to_string()
+            } else {
+                String::new()
+            },
+            None => String::new()
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
+    let send_email_via_sendgrid = env::var("USE_SENDGRID").is_ok();
     let notion_links = notion_links().await?;
     let mut stored_link_ids: Vec<String> = Vec::new();
     let stored_links_path = Path::new(SENT_NOTION_LINKS_FILENAME);
@@ -52,10 +108,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
     }).collect();
 
     println!("links to send = {:?}", links_to_send);
-    // sendgrid::send_email().await?;
     record_sent_links(&links_to_send);
 
+    let template = EmailTemplate{
+        links: build_email_body(links_to_send).await
+    };
+
+    let email_body = template.render().unwrap();
+
+    if send_email_via_sendgrid {
+        sendgrid::send_email(email_body).await?;
+    } else {
+        local_mail::send_local_mail(email_body);
+    }
+
     Ok(())
+}
+
+async fn build_email_body(links: Vec<&notion::NotionLink>) -> Vec<EmailLink>{
+    let email_futures: Vec<_> = links.into_iter().map(|link|{
+        EmailLink::new(link)
+    }).collect();
+
+    let results = future::join_all(email_futures).await;
+
+    results.into_iter().filter_map(Result::ok).collect()
 }
 
 async fn notion_links() -> Result<Vec<notion::NotionLink>, Box<dyn std::error::Error>>{
@@ -131,7 +208,6 @@ async fn get_notion_links() -> Result<Vec<notion::NotionLink>, Box<dyn std::erro
         println!("first result : {:?}", response.results.get(0).unwrap());
         println!("cursor = {:?}", response.next_cursor);
         println!("result count = {}", response.results.len());
-
 
         has_more = response.has_more;
 
