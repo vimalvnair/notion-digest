@@ -16,7 +16,7 @@ mod local_mail;
 
 const NOTION_LINKS_FILENAME: &str = "notion_links.json";
 const SENT_NOTION_LINKS_FILENAME: &str = "sent_notion_links.json";
-const NUMBER_OF_LINKS_TO_FECTH: usize = 3;
+const DEFAULT_NUMBER_OF_LINKS_TO_FECTH: usize = 3;
 
 #[derive(Template)]
 #[template(path="email.html")]
@@ -71,7 +71,7 @@ impl<'a> EmailLink<'a> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
-    let send_email_via_sendgrid = env::var("USE_SENDGRID").is_ok();
+    let send_email_via_local_smtp = env::var("USE_LOCAL_EMAIL").is_ok();
     let notion_links = notion_links().await?;
     let mut stored_link_ids: Vec<String> = Vec::new();
     let stored_links_path = Path::new(SENT_NOTION_LINKS_FILENAME);
@@ -86,8 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         !stored_link_ids.contains(&link.link_id)
     }).collect();
 
+    let number_of_links_to_fetch = env::var("NUMBER_OF_LINKS_TO_FETCH")
+        .unwrap_or(DEFAULT_NUMBER_OF_LINKS_TO_FECTH.to_string())
+        .parse::<usize>()
+        .unwrap_or(DEFAULT_NUMBER_OF_LINKS_TO_FECTH);
+
     let total_number_of_links = filtered_notion_links.len();
-    let number_of_links_to_fetch = if total_number_of_links > NUMBER_OF_LINKS_TO_FECTH { NUMBER_OF_LINKS_TO_FECTH } else { total_number_of_links };
+    let number_of_links_to_fetch = if total_number_of_links > number_of_links_to_fetch { number_of_links_to_fetch } else { total_number_of_links };
     println!("total_number_of_links = {}", total_number_of_links);
 
     let mut rng = rand::thread_rng();
@@ -116,10 +121,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 
     let email_body = template.render().unwrap();
 
-    if send_email_via_sendgrid {
-        sendgrid::send_email(email_body).await?;
-    } else {
+    if send_email_via_local_smtp {
         local_mail::send_local_mail(email_body);
+    } else {
+        sendgrid::send_email(email_body).await?;
     }
 
     Ok(())
