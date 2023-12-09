@@ -50,8 +50,6 @@ impl<'a> EmailLink<'a> {
         let description = Self::get_og_attribute(&html_fragment, "description");
         let image = Self::get_og_attribute(&html_fragment, "image");
 
-        println!("description = {:?}", description);
-
         Ok((description, image))
     }
 
@@ -181,7 +179,6 @@ fn record_sent_links(sent_links: &Vec<&notion::NotionLink>){
         let stored_links: Vec<notion::SentLink> = serde_json::from_str(&stored_links).unwrap();
 
         sent_links.extend(stored_links);
-        println!("sent_links_count: {}", sent_links.len());
         file.write_all(serde_json::to_string(&sent_links).unwrap().as_bytes()).unwrap();
     }
 }
@@ -209,10 +206,6 @@ async fn get_notion_links() -> Result<Vec<notion::NotionLink>, Box<dyn std::erro
         println!("Request params: {:?}", request_params);
 
         let response: NotionPage = get_notion_page(&request_params).await?;
-
-        println!("first result : {:?}", response.results.get(0).unwrap());
-        println!("cursor = {:?}", response.next_cursor);
-        println!("result count = {}", response.results.len());
 
         has_more = response.has_more;
 
