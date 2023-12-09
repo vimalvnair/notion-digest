@@ -2,11 +2,6 @@
 
 This Rust application is designed to help you revisit the links you've saved in Notion. It randomly selects three links from your "My links" database and sends them via email, allowing you to discover or re-discover valuable resources you've saved over time.
 
-## Features
-
-- **Notion API Integration:** Fetches links directly from your Notion "My links" database.
-- **SendGrid Email Delivery:** Configurable email delivery to send a digest of links.
-
 ## Environment Variables
 
 Configure the application using these environment variables:
