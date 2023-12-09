@@ -32,3 +32,8 @@ To run this application automatically, you can use a scheduler like cron. Here's
 
 ```crontab
 0 8 * * * /path/to/your/app
+```
+
+### License
+
+This project is released under the [MIT License](https://opensource.org/license/mit/).
