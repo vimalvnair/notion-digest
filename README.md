@@ -32,7 +32,7 @@ Configure the application using these environment variables:
 To run this application automatically, you can use a scheduler like cron. Here's an example of a cron job that runs the application every day at a specified time:
 
 ```crontab
-0 8 * * * /path/to/your/app
+0 8 * * * /path/to/the/digest-app
 ```
 
 ### License
